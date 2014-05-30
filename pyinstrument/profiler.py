@@ -3,6 +3,7 @@ import sys
 import os
 import timeit
 import signal
+import json
 from collections import deque
 from operator import methodcaller
 
@@ -176,7 +177,16 @@ class Profiler(object):
             </html>'''.format(css=css, js=js, jquery_js=jquery_js, body=body)
 
         return page
-
+    def as_json( self ):
+        """Produce our raw data-structure in json format"""
+        return json.dumps( self.stack_self_time.items() )
+    def from_json( self, data ):
+        """Read our raw data-structures to the given file handle in json format"""
+        content = json.loads( data )
+        for record in content:
+            key,time = record 
+            self.stack_self_time[tuple(key)] = time
+    
 
 class Frame(object):
     """

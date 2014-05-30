@@ -4,16 +4,44 @@ import os
 import codecs
 from pyinstrument import Profiler
 
+def write_output( options, profiler ):
+    try:
+        if options.outfile:
+            f = codecs.open(options.outfile, 'w', 'utf-8')
+            unicode = True
+            color = False
+        else:
+            f = sys.stdout
+            unicode = stdout_supports_unicode()
+            color = stdout_supports_color()
+
+        if options.output_json:
+            f.write(profiler.as_json())
+        elif options.output_html:
+            f.write(profiler.output_html())
+        else:
+            f.write(profiler.output_text(unicode=unicode, color=color))
+    finally:
+        if f is not sys.stdout:
+            f.close()
+    
+
 def main():
-    usage = "usage: %prog [-h] [-o output_file_path] scriptfile [arg] ..."
+    usage = "usage: %prog [-h] [[-o output_file_path] scriptfile [arg] ...] | [ -i infile ]"
     parser = OptionParser(usage=usage)
     parser.allow_interspersed_args = False
     parser.add_option('', '--html',
         dest="output_html", action='store_true',
         help="output HTML instead of text", default=False)
+    parser.add_option('', '--json',
+        dest="output_json", action='store_true',
+        help="output raw JSON dump instead of text or HTML", default=False)
     parser.add_option('-o', '--outfile',
         dest="outfile", action='store', 
         help="save stats to <outfile>", default=None)
+    parser.add_option('-i', '--infile',
+        dest="infile", action='store', 
+        help="load stats from JSON file <infile>", default=None)
 
     if not sys.argv[1:]:
         parser.print_usage()
@@ -43,22 +71,23 @@ def main():
             pass
 
         profiler.stop()
+        
+        write_output( options, profiler )
 
-        if options.outfile:
-            f = codecs.open(options.outfile, 'w', 'utf-8')
-            unicode = True
-            color = False
+    elif options.infile:
+        profiler = Profiler()
+        if options.infile in (b'-','-'):
+            fh = sys.stdin
         else:
-            f = sys.stdout
-            unicode = stdout_supports_unicode()
-            color = stdout_supports_color()
-
-        if options.output_html:
-            f.write(profiler.output_html())
-        else:
-            f.write(profiler.output_text(unicode=unicode, color=color))
-
-        f.close()
+            fh = codecs.open( options.infile, 'r', 'utf-8')
+        try:
+            content = fh.read()
+        finally:
+            fh.close()
+        
+        profiler.from_json( content )
+        write_output( options, profiler )
+        
     else:
         parser.print_usage()
     return parser
